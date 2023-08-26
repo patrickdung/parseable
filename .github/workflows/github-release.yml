@@ -2,72 +2,60 @@ name: GitHub  Release
 
 on:
   push:
-    tags:
-    - v[0-9]+.[0-9]+.[0-9]+*
+     - main
+    #tags:
+    #- v[0-9]+.[0-9]+.[0-9]+*
+
+env:
+  CARGO_TERM_COLOR: always
+  CONTAINER_REGISTRY: ghcr.io
+  # ## GH Repository must be lower case when using in GH action
+  CONTAINER_REPOSITORY: ${{ github.repository }}
+  ORIGINAL_SOURCECODE_URL: https://github.com/parseablehq/parseable
 
 jobs:
+
+  init-env:
+    name: Set env outputs
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    permissions:
+      actions: none
+      checks: none
+      contents: none
+      deployments: none
+      issues: none
+      packages: none
+      pull-requests: none
+      repository-projects: none
+      security-events: none
+      statuses: none
+      # id-token: write # needed for signing the images with GitHub OIDC **not production ready**
+    outputs:
+      container_registry_base_uri: ${{ steps.set-env.outputs.container_registry_base_uri }}
+    steps:
+      - name: Set env for later jobs
+        id: set-env
+        run: |
+          echo "container_registry_base_uri=$(echo $CONTAINER_REGISTRY/$(echo $CONTAINER_REPOSITORY | tr 'A-Z' 'a-z'))" >> $GITHUB_OUTPUT
+
   release:
     name: Publish to Github Relases
+    needs: [init-env]
     outputs:
       rc: ${{ steps.check-tag.outputs.rc }}
 
     strategy:
+      fail-fast: false
       matrix:
         include:
-        - target: aarch64-unknown-linux-musl
+        - build: aarch64
+          #os: ubuntu-20.04
           os: ubuntu-latest
+          target: aarch64-unknown-linux-gnu
+          linker: gcc-aarch64-linux-gnu
           use-cross: true
-          cargo-flags: ""
-        - target: aarch64-apple-darwin
-          os: macos-latest
-          use-cross: true
-          cargo-flags: ""
-        - target: aarch64-pc-windows-msvc
-          os: windows-latest
-          use-cross: true
-          cargo-flags: "--no-default-features"
-        - target: x86_64-apple-darwin
-          os: macos-latest
-          cargo-flags: ""
-        - target: x86_64-pc-windows-msvc
-          os: windows-latest
-          cargo-flags: ""
-        - target: x86_64-unknown-linux-musl
-          os: ubuntu-latest
-          use-cross: true
-          cargo-flags: ""
-        - target: i686-unknown-linux-musl
-          os: ubuntu-latest
-          use-cross: true
-          cargo-flags: ""
-        - target: i686-pc-windows-msvc
-          os: windows-latest
-          use-cross: true
-          cargo-flags: ""
-        - target: armv7-unknown-linux-musleabihf
-          os: ubuntu-latest
-          use-cross: true
-          cargo-flags: ""
-        - target: arm-unknown-linux-musleabihf
-          os: ubuntu-latest
-          use-cross: true
-          cargo-flags: ""
-        - target: mips-unknown-linux-musl
-          os: ubuntu-latest
-          use-cross: true
-          cargo-flags: "--no-default-features"
-        - target: mipsel-unknown-linux-musl
-          os: ubuntu-latest
-          use-cross: true
-          cargo-flags: "--no-default-features"
-        - target: mips64-unknown-linux-gnuabi64
-          os: ubuntu-latest
-          use-cross: true
-          cargo-flags: "--no-default-features"
-        - target: mips64el-unknown-linux-gnuabi64
-          os: ubuntu-latest
-          use-cross: true
-          cargo-flags: "--no-default-features"
+          asset_name: parseable-linux-aarch64
     runs-on: ${{matrix.os}}
 
     steps:
@@ -94,7 +82,30 @@ jobs:
         
     - name: Install OpenSSL
       if: runner.os == 'Linux'
-      run: sudo apt-get install -y libssl-dev
+      run: sudo apt-get install -y libssl-dev 
+
+    - name: APT update
+      run: |
+        sudo apt update
+
+    - name: Install target specific tools
+      if: matrix.use-cross
+      run: |
+        sudo apt-get install -y ${{ matrix.linker }}
+
+    - name: Configure target aarch64 GNU
+      if: matrix.target == 'aarch64-unknown-linux-gnu'
+      ## Environment variable is not passed using env:
+      ## LD gold won't work with MUSL
+      # env:
+      #   JEMALLOC_SYS_WITH_LG_PAGE: 16
+      #   RUSTFLAGS: '-Clink-arg=-fuse-ld=gold'
+      ## LD gold had problem with meili v0.30 aarch glibc build
+      run: |
+        echo '[target.aarch64-unknown-linux-gnu]' >> ~/.cargo/config
+        echo 'linker = "aarch64-linux-gnu-gcc"' >> ~/.cargo/config
+        echo 'JEMALLOC_SYS_WITH_LG_PAGE=16' >> $GITHUB_ENV
+        ## echo RUSTFLAGS="-Clink-arg=-fuse-ld=gold" >> $GITHUB_ENV
   
     - name: Show Version Information (Rust, cargo, GCC)
       shell: bash
