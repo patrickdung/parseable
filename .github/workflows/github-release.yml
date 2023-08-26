@@ -125,14 +125,19 @@ jobs:
         command: build
         args: --locked --release --target=${{ matrix.target }} ${{ matrix.cargo-flags }}
 
-    - name: Upload the binary to release
-      uses: svenstaro/upload-release-action@v2
+    - uses: actions/upload-artifact@v3
       with:
-        repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: target/${{ matrix.target }}/release/parseable
-        asset_name: ${{ matrix.asset_name }}
-        # tag: ${{ env.REMOTE_BRANCH_NAME }}
-        overwrite: true
+        name: artifact
+        path: target/${{ matrix.target }}/release/parseable
+
+    #- name: Upload the binary to release
+    #  uses: svenstaro/upload-release-action@v2
+    #  with:
+    #    repo_token: ${{ secrets.GITHUB_TOKEN }}
+    #    file: target/${{ matrix.target }}/release/parseable
+    #    asset_name: ${{ matrix.asset_name }}
+    #    # tag: ${{ env.REMOTE_BRANCH_NAME }}
+    #    overwrite: true
 
     - name: Build Archive
       shell: bash
