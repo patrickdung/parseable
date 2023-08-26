@@ -9,7 +9,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CONTAINER_REGISTRY: ghcr.io
-  # ## GH Repository must be lower case when using in GH action
+  # # GH Repository must be lower case when using in GH action
   CONTAINER_REPOSITORY: ${{ github.repository }}
   ORIGINAL_SOURCECODE_URL: https://github.com/parseablehq/parseable
 
